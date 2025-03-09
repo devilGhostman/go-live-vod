@@ -14,7 +14,7 @@ const VideoList = ({ videos, handleVideo, live }) => {
         {!live ? "Transcoded Videos" : "Lives"}
       </h2>
       {videos.length > 0 ? (
-        <div className="w-auto h-auto space-x-3 space-y-5 flex flex-wrap justify-start items-center">
+        <div className="w-auto h-auto space-x-3 flex flex-wrap justify-start items-center">
           {videos.map((video, i) => (
             <div
               key={i}
@@ -26,7 +26,10 @@ const VideoList = ({ videos, handleVideo, live }) => {
                   <p>In Queue</p>
                 </div>
               ) : (
-                <img src={video.videoUrls.poster} style={{ width: "100%" ,height:"100%"}} />
+                <img
+                  src={video.videoUrls.poster}
+                  style={{ width: "100%", height: "100%" }}
+                />
               )}
               <p className="w-full text-sm text-wrap my-4">{video.title}</p>
             </div>

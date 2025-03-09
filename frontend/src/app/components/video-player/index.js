@@ -10,7 +10,7 @@ const VideoPlayer = ({ video }) => {
 
   const masterFileSrc = video?.videoUrls?.master;
 
-  const resolutions = ["240p", "360p", "480p", "720p", "1080p", "audio"];
+  const resolutions = ["144p","240p", "360p", "480p", "720p", "1080p", "audio"];
 
   const availableResolutions = resolutions
     .filter((res) => video?.videoUrls.hasOwnProperty(res))

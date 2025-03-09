@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useCallback, useState } from "react";
-import { useDropzone } from "react-dropzone";
-import { MdDelete, MdEdit } from "react-icons/md";
 
 import axios from "../axios/axios";
 import Navbar from "../components/navbar";
@@ -10,69 +8,57 @@ import { useRouter } from "next/navigation";
 
 function Upload() {
   const router = useRouter();
-  const [video, setvideo] = useState();
   const [error, seterror] = useState("");
   const [onSuccess, setonSuccess] = useState(false);
 
-  const onDrop = useCallback((acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (file && file.type === "video/mp4") {
-      seterror("");
-      setvideo(file);
-    } else {
-      seterror("Please select a MP4 file");
-    }
-  }, []);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [selectedResolutions, setSelectedResolutions] = useState([]);
 
-  const { getRootProps, getInputProps } = useDropzone({
-    onDrop,
-    accept: "video/mp4",
-    maxFiles: 1,
-  });
+  const handleResolutionToggle = (resolution) => {
+    setSelectedResolutions((prev) =>
+      prev.includes(resolution)
+        ? prev.filter((res) => res !== resolution)
+        : [...prev, resolution]
+    );
+  };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log({
+      name,
+      url,
+      resolutions: selectedResolutions,
+    });
+    handleUpload(name, url, selectedResolutions);
+  };
 
-  const handlePost = async () => {
-    if (onSuccess) return;
-    const form = new FormData();
+  const generateRandomId = () => {
+    return `id-${Math.random().toString(36).slice(2, 11)}-${Date.now()}`;
+  };
 
-    if (video) {
-      form.append("video", video);
-      form.append("videoPath", video.name);
-      form.append("id", "1");
-      form.append("namespace","dev");
-      form.append("streamName", "test");
-
-      form.append('config[codecs][video]', "264");
-      form.append('config[codecs][audio]', "aac");
-
-      form.append(`config[resolutions][0]`, "1080p");
-      form.append(`config[resolutions][1]`, "720p");
-      form.append(`config[resolutions][2]`, "480p");
-      form.append(`config[resolutions][3]`, "360p");
-      
-
-      console.log("FORM", form);
-
-      axios.post
-
-      await axios
-        .post("/", form, {
-          headers: {
-            "Content-Type": "multipart/form-data",
+  const handleUpload = async (name, url, resolutions) => {
+    try {
+      const response = await axios.post("/vod/", {
+        id: generateRandomId(),
+        namespace: "dev",
+        streamName: name,
+        sourceUrl: url,
+        config: {
+          codecs: {
+            video: "h264",
+            audio: "aac",
           },
-        })
-        .then(() => {
-          console.log("video uploaded");
-          setonSuccess(true);
-          // setTimeout(() => {
-          //   router.push("/");
-          // }, 500);
-        })
-        .catch((error) => {
-          console.log(error);
-          seterror(error);
-        });
-    } else {
-      seterror("No video selected");
+          resolutions: resolutions,
+        },
+      });
+
+      if (response.status === 200) {
+        router.push("/");
+      }
+      console.log(response.data);
+    } catch (error) {
+      console.error(error);
+      seterror(error.message);
     }
   };
 
@@ -80,45 +66,79 @@ function Upload() {
     <>
       <Navbar />
       <div className="w-full h-screen flex justify-center items-center flex-col">
-        <div className="p-4 mt-4 rounded-[5px] border-4 border-white w-3/4 lg:w-1/2 flex justify-between items-center">
-          <div className="w-full flex justify-between items-center">
-            <div
-              {...getRootProps()}
-              className="p-4 w-full h-20 hover:cursor-pointer border-dotted border-2 border-white flex justify-center items-center"
+        <form onSubmit={handleSubmit}>
+          {/* Name Input */}
+          <div className="mb-4">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
             >
-              <input {...getInputProps()} />
-              {!video ? (
-                <p className="text-white ">
-                  Drag 'n' drop some video here, or click to select video
-                </p>
-              ) : (
-                <div className="w-full flex justify-between items-center">
-                  <h3 className="text-wrap">{video.name}</h3>
-                  <MdEdit className="hover:cursor-pointer hover:text-red-500 text-[20px]" />
-                </div>
+              Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 p-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Enter name"
+              required
+            />
+          </div>
+
+          {/* URL Input */}
+          <div className="mb-4">
+            <label
+              htmlFor="url"
+              className="block text-sm font-medium text-gray-700"
+            >
+              URL
+            </label>
+            <input
+              type="url"
+              id="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="mt-1 p-2 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Enter URL"
+              required
+            />
+          </div>
+
+          {/* Resolutions as Buttons */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Resolutions
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {["144p", "240p", "360p", "480p", "720p", "1080p"].map(
+                (resolution) => (
+                  <button
+                    key={resolution}
+                    type="button"
+                    onClick={() => handleResolutionToggle(resolution)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none ${
+                      selectedResolutions.includes(resolution)
+                        ? "bg-red-700  text-white"
+                        : "bg-gray-200 text-gray-700"
+                    } hover:bg-red-500 hover:text-white`}
+                  >
+                    {resolution}
+                  </button>
+                )
               )}
             </div>
-            {video && (
-              <div
-                onClick={() => {
-                  setvideo(null);
-                  setonSuccess(false);
-                }}
-                className="hover:cursor-pointer hover:text-red-500 text-[20px] mx-4"
-              >
-                <MdDelete />
-              </div>
-            )}
           </div>
-        </div>
-        {error && <p className="text-red-500 mt-10">{error}</p>}
-        <button
-          onClick={handlePost}
-          type="submit"
-          className="mt-10 text-[18px] font-bold hover:cursor-pointer hover:text-red-500 w-1/6"
-        >
-          {onSuccess ? "VIDEO UPLOADED" : "UPLOAD"}
-        </button>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="mt-5 text-[18px] font-bold hover:cursor-pointer hover:text-red-500 w-1/6"
+          >
+            {onSuccess ? "VIDEO UPLOADED" : "UPLOAD"}
+          </button>
+        </form>
+        {error && <p>{error}</p>}
       </div>
     </>
   );
