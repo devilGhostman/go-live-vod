@@ -1,0 +1,36 @@
+package shutdown
+
+import (
+	"github/devilGhostman/backend/internal/externalcmd"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"go.uber.org/zap"
+)
+
+func EnableGrafullyShutdown() {
+	s := make(chan os.Signal, 1)
+	signal.Notify(s, os.Interrupt)
+	signal.Notify(s, syscall.SIGTERM)
+	signal.Notify(s, syscall.SIGINT)
+
+	go func() {
+		<-s
+		// killing all running processes, in order to avoid ghost processes
+		for _, cmd := range externalcmd.GloblaActiveCmds {
+			zap.S().Infof("closing gracefully...\ncmdstring: %s", cmd.GetCmdString())
+			cmd.Close()
+			syscall.Kill(-cmd.GetProcess().Pid, syscall.SIGINT)
+			err := cmd.Process.Kill()
+			if err != nil {
+				zap.S().Infof("failed to kill :%s", cmd.GetProcess().Pid)
+			}
+			zap.S().Infof("closed processid: %s", cmd.GetProcess().Pid)
+		}
+
+		// Removing output dir
+		os.RemoveAll("output")
+		os.Exit(0)
+	}()
+}
