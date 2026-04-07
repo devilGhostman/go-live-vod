@@ -113,7 +113,7 @@ func (vt *VodTranscoder) generateKey() error {
 	}
 
 	baseUrl := os.Getenv("BASE_URL")
-	keyUri := baseUrl + "/hls1/" + vt.Namespace + "/" + vt.ID + "/enc.key"
+	keyUri := baseUrl + "/hls/" + vt.Namespace + "/" + vt.ID + "/enc.key"
 	content := fmt.Sprintf("%s\n%s\n", keyUri, keyPath)
 
 	if err := os.WriteFile(keyInfoPath, []byte(content), 0644); err != nil {
