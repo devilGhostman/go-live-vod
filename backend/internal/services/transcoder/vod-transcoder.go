@@ -1,6 +1,7 @@
 package transcoder
 
 import (
+	"crypto/rand"
 	"fmt"
 	"github/devilGhostman/backend/internal/externalcmd"
 	"os"
@@ -51,6 +52,10 @@ func NewVodTranscoder(source, namespace, ID string, Resolutions []string, videoC
 
 func (vt *VodTranscoder) Run() error {
 	vt.prepareOutputDir()
+	if err := vt.generateKey(); err != nil {
+		return err
+	}
+
 	cmdString := vt.generateCmdString()
 	_, err := vt.generateMasterHls()
 	if err != nil {
@@ -93,6 +98,31 @@ func (vt *VodTranscoder) prepareOutputDir() {
 	}
 }
 
+func (vt *VodTranscoder) generateKey() error {
+	keyPath := fmt.Sprintf("%s/enc.key", vt.OutputDir)
+	keyInfoPath := fmt.Sprintf("%s/enc.keyinfo", vt.OutputDir)
+
+	// AES-128 key (16 bytes)
+	key := make([]byte, 16)
+	if _, err := rand.Read(key); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(keyPath, key, 0644); err != nil {
+		return err
+	}
+
+	baseUrl := os.Getenv("BASE_URL")
+	keyUri := baseUrl + "/hls1/" + vt.Namespace + "/" + vt.ID + "/enc.key"
+	content := fmt.Sprintf("%s\n%s\n", keyUri, keyPath)
+
+	if err := os.WriteFile(keyInfoPath, []byte(content), 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (vt *VodTranscoder) generateCmdString() string {
 	prefix := fmt.Sprintf(
 		"%s -re -i \"%s\" ",
@@ -100,6 +130,8 @@ func (vt *VodTranscoder) generateCmdString() string {
 	)
 
 	var commands []string
+
+	keyInfoFile := fmt.Sprintf("%s/enc.keyinfo", vt.OutputDir)
 
 	for _, variant := range vt.Resolutions {
 		segmentFilename := fmt.Sprintf("%d_", time.Now().Unix()) + "%04d.ts"
@@ -109,11 +141,22 @@ func (vt *VodTranscoder) generateCmdString() string {
 
 		cmd := fmt.Sprintf(
 			" -r %s -vf %s -c:v libx264 -b:v %dk -c:a aac -b:a 128k -ac 2 -preset fast "+
-				"-f hls -hls_time 10 -hls_playlist_type vod -hls_segment_filename %s/%s/%s -start_number 0 %s/%s/%s.m3u8",
-			framerate, resolution, bitrate, vt.OutputDir, variant, segmentFilename, vt.OutputDir, variant, variant)
+				"-f hls -hls_time 10 -hls_playlist_type vod "+
+				"-hls_key_info_file %s "+
+				"-hls_segment_filename %s/%s/%s -start_number 0 %s/%s/%s.m3u8",
+			framerate,
+			resolution,
+			bitrate,
+			keyInfoFile,
+			vt.OutputDir,
+			variant,
+			segmentFilename,
+			vt.OutputDir,
+			variant,
+			variant,
+		)
 
 		commands = append(commands, cmd)
-
 	}
 
 	generatethumbnailcmd := fmt.Sprintf(" -ss 1.4 -frames:v 1 %s/thumbnail.jpg", vt.OutputDir)
@@ -122,7 +165,6 @@ func (vt *VodTranscoder) generateCmdString() string {
 	finalCmd := fmt.Sprintf("%s %s", prefix, strings.Join(commands, ""))
 
 	return finalCmd
-
 }
 
 func (vt *VodTranscoder) getVideoScaledata(variant string) string {
